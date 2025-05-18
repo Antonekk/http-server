@@ -12,17 +12,13 @@
 #define DEBUG
 
 
-#define TIMEOUT 100
+#define TIMEOUT 1000
 
-#define MAX_TO_RECIVE 10000000
 
 #define MIN_PORT 1024
 #define MAX_PORT 65535
 
-#define MAX_REQUEST_LEN 150
-
-#define MAX_RESPONSE_LEN 1200
-#define MAX_RESPONSE_BODY_LEN 1000
+#define BACKLOG 64
 
 
 // Error handling

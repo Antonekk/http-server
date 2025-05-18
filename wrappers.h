@@ -14,6 +14,8 @@ void my_inet_pton(int af, const char *src, void *dst);
 int my_socket(int domain, int type, int protocol);
 
 int my_bind(int sockfd, struct sockaddr *addr, socklen_t addr_len);
+int my_listen(int sockfd, int backlog);
+int my_accept(int sockfd, struct sockaddr *addr, socklen_t *addr_len);
 
 int my_poll(struct pollfd *fds, nfds_t nfds, int timeout);
 

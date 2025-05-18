@@ -19,6 +19,24 @@ int my_bind(int sockfd, struct sockaddr *addr, socklen_t addr_len)
     return result;
 }
 
+int my_listen(int sockfd, int backlog)
+{
+    int result = listen(sockfd, backlog);
+    if(result < 0){
+        error_exit("listen");
+    }
+    return result;
+}
+
+int my_accept(int sockfd, struct sockaddr *addr, socklen_t *addr_len)
+{
+    int result = accept(sockfd, addr, addr_len);
+    if(result < 0){
+        error_exit("accept");
+    }
+    return result;
+}
+
 int my_poll(struct pollfd *fds, nfds_t nfds, int timeout){
     int res = poll(fds, nfds, timeout);
     if (res == -1) {
