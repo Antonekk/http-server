@@ -31,4 +31,4 @@ distclean: clean
 
 
 test: 
-	./server 2137 ./webpages 
+	./server 8888 ./webpages 

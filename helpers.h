@@ -11,7 +11,6 @@
 
 #define DEBUG
 
-#define SERVER_ADDRESS "127.0.0.1"
 
 #define TIMEOUT 1000
 

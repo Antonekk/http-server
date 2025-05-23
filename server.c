@@ -6,23 +6,73 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/socket.h>
-
+#include <poll.h>
 
 #include "wrappers.h"
 #include "helpers.h"
 
+
+#define REQUEST_BUFFER_LEN 1024
+#define RESPONSE_BUFFER_LEN 100000
+
+
 // Setup sockaddr_in structure for server 
-void setup_server_addr(struct sockaddr_in *server_addr, int port_number, char *ip_addr){
+void setup_server_addr(struct sockaddr_in *server_addr, int port_number){
     server_addr->sin_family = AF_INET;
     server_addr->sin_port = htons(port_number);
-
-    // Translate string form of ip addr 
-    my_inet_pton(AF_INET, ip_addr, &server_addr->sin_addr);
+    server_addr->sin_addr.s_addr = INADDR_ANY;
 
 }
 
+
+char *get_content_type(char *ext){
+    if (strcmp(ext, ".html") == 0) return "text/html; charset=utf-8";
+    else if (strcmp(ext, ".txt") == 0) return "text/plain, charset=utf-8";
+    else if (strcmp(ext, ".css" ) == 0) return "text/css";
+    else if (strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0) return "image/jpeg";
+    else if (strcmp(ext, ".png")) return "image/png";
+    else if (strcmp(ext, ".pdf")) return "application/pdf";
+    else return "application/octet-stream";
+
+}
+
+void send_http_response(int fd, int code, char *code_interpr, char *content_type , char *body){
+    char response_buf[RESPONSE_BUFFER_LEN];
+    int written = snprintf(response_buf, RESPONSE_BUFFER_LEN,
+        "HTTP/1.1 %d %s\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %ld\r\n"
+        "\r\n"
+        "%s",
+        code, code_interpr, content_type, strlen(body),body
+    );
+
+    send(fd, response_buf, written, 0);
+}
+
+static inline void send_error_response(int fd, int code, char *code_interpr, char *body){
+    send_http_response(fd, code , code_interpr, "text/html; charset=utf-8", body);
+}
+
+
 // Runs main server logic
-void run_server_logic(int connection_fd){
+void run_server_logic(int connection_fd, char *root){
+    char request_buffer[REQUEST_BUFFER_LEN];
+    struct pollfd pfd = {.fd=connection_fd, .events=POLLIN};
+
+    int res = my_poll(&pfd, 1, TIMEOUT);
+    if (res == 0) return;
+
+    ssize_t len = recv(connection_fd, request_buffer, REQUEST_BUFFER_LEN - 1, 0);
+    if (len <= 0) return;
+    request_buffer[len] = '\0';
+
+    if(strncmp(request_buffer, "GET ", 4) != 0){
+        send_error_response(connection_fd, 501, "Not Implemented","<h1> Not Implemented </h1>");
+    }
+
+    send_error_response(connection_fd, 501, "Not Implemented","<h1> Not Implemented </h1>");
+
     return;
 }
 
@@ -60,7 +110,7 @@ int main(int argc, char* argv[]){
     // Setup addres structure
     struct sockaddr_in server_address;
     memset(&server_address, 0, sizeof(struct sockaddr_in));
-    setup_server_addr(&server_address, port, SERVER_ADDRESS);
+    setup_server_addr(&server_address, port);
 
     // Bind and setup listening socket
     my_bind(server_fd, (struct sockaddr*) &server_address, sizeof(server_address));
@@ -72,14 +122,19 @@ int main(int argc, char* argv[]){
 
     for(;;){
         int connect_fd = my_accept(server_fd, NULL, NULL);
+        printf("Accepted\n");
 
+        /*
         struct timeval conn_time;
         conn_time.tv_usec = TIMEOUT * 1000;
         setsockopt(connect_fd, SOL_SOCKET, SO_RCVTIMEO, &conn_time, sizeof(conn_time));
-
+        */
+        run_server_logic(connect_fd, directory_path);
 
         close(connect_fd);
     }
+
+    close(server_fd);
 
 
 
