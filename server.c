@@ -54,6 +54,10 @@ static inline void send_error_response(int fd, int code, char *code_interpr, cha
     send_http_response(fd, code , code_interpr, "text/html; charset=utf-8", body);
 }
 
+static inline void send_not_implemented_response(int fd){
+    send_error_response(fd, 501, "Not Implemented","<h1> Not Implemented </h1>");
+}
+
 
 // Runs main server logic
 void run_server_logic(int connection_fd, char *root){
@@ -67,9 +71,37 @@ void run_server_logic(int connection_fd, char *root){
     if (len <= 0) return;
     request_buffer[len] = '\0';
 
-    if(strncmp(request_buffer, "GET ", 4) != 0){
-        send_error_response(connection_fd, 501, "Not Implemented","<h1> Not Implemented </h1>");
+    char sub_path[256];
+    char host[256];
+    if(sscanf(request_buffer, "GET %256s HTTP/1.1\r\nHost: %256s", sub_path, host)!=2){
+        send_not_implemented_response(connection_fd);
+        return;
     }
+
+    // Removes port part from host
+    char *colon = strchr(host, ':');
+    if (colon) {
+        *colon = '\0';
+    }
+
+    #ifdef DEBUG
+    printf("Subpath: %s, Host: %s\n", sub_path, host);
+    #endif
+    
+    char path[256];
+    snprintf(path, sizeof(path), "%s/%s%s", root, host, sub_path);
+    char new_root[256];
+    snprintf(new_root, sizeof(new_root),"%s/%s", root, host);
+
+    // Check if after path resolution, resolved path has propper prefix
+    char resolved_path[256];
+    if (!realpath(path, resolved_path) || strncmp(resolved_path, new_root, strlen(new_root)) != 0) {
+        send_error_response(connection_fd, 403, "Forbidden", "<h1>Forbidden</h1>");
+        return;
+    }
+
+
+    
 
     send_error_response(connection_fd, 501, "Not Implemented","<h1> Not Implemented </h1>");
 
