@@ -100,6 +100,14 @@ int my_atoi(char *src){
     return result;
 }
 
+void my_stat(char *pathname, struct stat *statbuf)
+{
+    int res = stat(pathname, statbuf);
+    if (res != 0){
+        error_exit("stat");
+    }
+}
+
 FILE *my_fopen(const char *filename, const char *mode){
     FILE *fd = fopen(filename, mode);
     if(!fd){

@@ -21,37 +21,51 @@ void setup_server_addr(struct sockaddr_in *server_addr, int port_number, char *i
 
 }
 
-
+// Runs main server logic
 void run_server_logic(int connection_fd){
     return;
 }
 
 int main(int argc, char* argv[]){
 
+    // Check for proper usage
     if(argc != 3){
         fprintf(stderr, "Usage: %s <port> <directory>\n", argv[0]);
+        exit(EXIT_FAILURE);
     }
 
+    // Assign program arguments
     int port = my_atoi(argv[1]);
-    char *directory = argv[2];
+    char *directory_path = argv[2];
 
+    // Check if given port is contained in valid range
     if(port < MIN_PORT || port > MAX_PORT){
         msg_exit("Port outside of valid range");
     }
 
+    struct stat server_dir;
+    my_stat(directory_path, &server_dir);
+
+    if(!S_ISDIR(server_dir.st_mode)){
+        msg_exit("Invalid directory");
+    }
+
     #ifdef DEBUG
-    printf("Open server on port: %d with directory: %s\n", port, directory);
+    printf("Open server on port: %d with directory: %s\n", port, directory_path);
     #endif
 
+    // Create listening socket
     int server_fd = my_socket(AF_INET, SOCK_STREAM, 0);
 
+    // Setup addres structure
     struct sockaddr_in server_address;
     memset(&server_address, 0, sizeof(struct sockaddr_in));
-    setup_server_addr(&server_address, port, "127.0.0.1");
+    setup_server_addr(&server_address, port, SERVER_ADDRESS);
 
+    // Bind and setup listening socket
     my_bind(server_fd, (struct sockaddr*) &server_address, sizeof(server_address));
-
     my_listen(server_fd, BACKLOG);
+
     #ifdef DEBUG
     printf("Listening...\n");
     #endif

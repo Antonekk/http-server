@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <poll.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include "helpers.h"
 
 void my_inet_pton(int af, const char *src, void *dst);
@@ -30,6 +31,8 @@ void *my_calloc(size_t nmemb, size_t size);
 int my_clock_gettime(clockid_t clockid, struct timespec *tp);
 
 int my_atoi(char *src);
+
+void my_stat(char *pathname, struct stat *statbuf);
 
 FILE *my_fopen(const char *filename, const char *mode);
 void my_fwrite(void *ptr, size_t size, size_t count, FILE *file);
