@@ -53,6 +53,17 @@ void send_http_response(int fd, int code, char *code_interpr, char *content_type
     send(fd, body, content_length, 0);
 }
 
+void send_redirect_response(int fd, const char *location) {
+    char response_buf[RESPONSE_BUFFER_LEN];
+    int len = snprintf(response_buf, sizeof(response_buf),
+        "HTTP/1.1 301 Moved Permanently\r\n"
+        "Location: %s\r\n"
+        "Content-Length: 0\r\n"
+        "\r\n", location);
+
+    send(fd, response_buf, len, 0);
+}
+
 static inline void send_error_response(int fd, int code, char *code_interpr, char *body){
     send_http_response(fd, code , code_interpr, "text/html; charset=utf-8", strlen(body),body);
 }
@@ -86,6 +97,7 @@ void run_server_logic(int connection_fd, char *root){
     if (colon) {
         *colon = '\0';
     }
+    char *port = colon+1;
 
     #ifdef DEBUG
     printf("Subpath: %s, Host: %s\n", sub_path, host);
@@ -111,11 +123,21 @@ void run_server_logic(int connection_fd, char *root){
     printf("Path: %s\n", path);
     if(stat(path, &file_stat) != 0){
         send_error_response(connection_fd, 404, "Not Found", "<h1> Not Found </h1>");
+        return;
+    }
+
+    
+    if(S_ISDIR(file_stat.st_mode)){
+        char redir[256];
+        snprintf(redir, sizeof(redir), "http://%s:%s%sindex.html", host, port,sub_path);
+        send_redirect_response(connection_fd, redir);
+        return;
     }
 
     int file_fd;
     if((file_fd = open(path, O_RDONLY)) < 0){
         send_error_response(connection_fd, 403, "Forbidden", "<h1>Forbidden</h1>");
+        return;
     }
 
     char *type = get_content_type(path);
