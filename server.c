@@ -15,6 +15,7 @@
 
 #define REQUEST_BUFFER_LEN 1024
 #define RESPONSE_BUFFER_LEN 1000000
+#define MAX_PATH 256
 
 
 // Setup sockaddr_in structure for server 
@@ -73,87 +74,114 @@ static inline void send_not_implemented_response(int fd){
 }
 
 
+int is_path_valid(int connection_fd, char *path, char *new_root){
+
+    // Resolve path to file
+    char resolved_path[MAX_PATH];
+    if (!realpath(path, resolved_path)) {
+        send_error_response(connection_fd, 404, "Not Found", "<h1> Not Found </h1>");
+        return -1;
+    }
+
+    // Resolve path to current website root
+    char resolved_root[MAX_PATH];
+    if (!realpath(new_root, resolved_root)) {
+        send_error_response(connection_fd, 500, "Internal Server Error", "<h1> Internal Server Error </h1>");
+        return -1;
+    }
+
+    // Check if prefixes match
+    if (strncmp(resolved_path, resolved_root, strlen(resolved_root)) != 0) {
+        send_error_response(connection_fd, 403, "Forbidden", "<h1>Forbidden</h1>");
+        return -1;
+    }
+    return 0;
+}
+
+
 // Runs main server logic
 void run_server_logic(int connection_fd, char *root){
     char request_buffer[REQUEST_BUFFER_LEN];
     struct pollfd pfd = {.fd=connection_fd, .events=POLLIN};
+    int keep_connection = 1;
 
-    int res = my_poll(&pfd, 1, TIMEOUT);
-    if (res == 0) return;
+    while (keep_connection) {
+        int res = my_poll(&pfd, 1, TIMEOUT);
+        if (res == 0) break;
 
-    ssize_t len = recv(connection_fd, request_buffer, REQUEST_BUFFER_LEN - 1, 0);
-    if (len <= 0) return;
-    request_buffer[len] = '\0';
+        ssize_t len = recv(connection_fd, request_buffer, REQUEST_BUFFER_LEN - 1, 0);
+        if (len <= 0) return;
+        request_buffer[len] = '\0';
 
-    char sub_path[256];
-    char host[256];
-    if(sscanf(request_buffer, "GET %256s HTTP/1.1\r\nHost: %256s", sub_path, host)!=2){
-        send_not_implemented_response(connection_fd);
-        return;
+        char sub_path[256];
+        char host[256];
+        char connection[50];
+        if(sscanf(request_buffer, "GET %256s HTTP/1.1\r\nHost: %256s\r\nConnection: %50s", sub_path, host, connection)<2){
+            send_not_implemented_response(connection_fd);
+            break;
+        }
+        
+        if(strcmp(connection, "close") == 0){
+            keep_connection = 0;
+        }
+
+        // Removes port part from host
+        char *colon = strchr(host, ':');
+        if (colon) {
+            *colon = '\0';
+        }
+        char *port = colon+1;
+
+        #ifdef DEBUG
+        printf("Subpath: %s, Host: %s\n", sub_path, host);
+        #endif
+        
+        char path[MAX_PATH];
+        snprintf(path, sizeof(path), "%s/%s%s", root, host, sub_path);
+        char new_root[MAX_PATH];
+        snprintf(new_root, sizeof(new_root),"%s/%s", root, host);
+
+        
+        //Check if path is inside a valid range
+        if(is_path_valid(connection_fd, path, new_root) < 0){
+            break;
+        }
+
+        struct stat file_stat;
+        printf("Path: %s\n", path);
+        if(stat(path, &file_stat) != 0){
+            send_error_response(connection_fd, 404, "Not Found", "<h1> Not Found </h1>");
+            break;
+        }
+
+        
+        if(S_ISDIR(file_stat.st_mode)){
+            char redir[256];
+            snprintf(redir, sizeof(redir), "http://%s:%s%sindex.html", host, port,sub_path);
+            send_redirect_response(connection_fd, redir);
+            break;
+        }
+
+        int file_fd;
+        if((file_fd = open(path, O_RDONLY)) < 0){
+            send_error_response(connection_fd, 403, "Forbidden", "<h1>Forbidden</h1>");
+            break;
+        }
+
+        char *type = get_content_type(path);
+        char *response_buffer = calloc(RESPONSE_BUFFER_LEN, sizeof(char));
+        ssize_t response_len = 0;
+
+        ssize_t bytes_read;
+        while ((bytes_read = read(file_fd, 
+                                response_buffer + response_len, 
+                                RESPONSE_BUFFER_LEN - response_len)) > 0) {
+            response_len += bytes_read;
+        }
+        send_http_response(connection_fd, 200, "OK", type, response_len,response_buffer);
+        close(file_fd);
+        free(response_buffer);
     }
-
-    // Removes port part from host
-    char *colon = strchr(host, ':');
-    if (colon) {
-        *colon = '\0';
-    }
-    char *port = colon+1;
-
-    #ifdef DEBUG
-    printf("Subpath: %s, Host: %s\n", sub_path, host);
-    #endif
-    
-    char path[256];
-    snprintf(path, sizeof(path), "%s/%s%s", root, host, sub_path);
-    char new_root[256];
-    snprintf(new_root, sizeof(new_root),"%s/%s", root, host);
-
-    // Check if after path resolution, resolved path has propper prefix
-    // TODO, 
-    /*
-    char resolved_path[256];
-    if (!realpath(path, resolved_path) || strncmp(resolved_path, new_root, strlen(new_root)) != 0) {
-        printf("\n\nRoot: %s\nNew Root: %s\n Path: %s\nResolved: %s\n", root, new_root, path,resolved_path);
-        send_error_response(connection_fd, 403, "Forbidden", "<h1>Forbidden</h1>");
-        return;
-    }
-    */
-
-    struct stat file_stat;
-    printf("Path: %s\n", path);
-    if(stat(path, &file_stat) != 0){
-        send_error_response(connection_fd, 404, "Not Found", "<h1> Not Found </h1>");
-        return;
-    }
-
-    
-    if(S_ISDIR(file_stat.st_mode)){
-        char redir[256];
-        snprintf(redir, sizeof(redir), "http://%s:%s%sindex.html", host, port,sub_path);
-        send_redirect_response(connection_fd, redir);
-        return;
-    }
-
-    int file_fd;
-    if((file_fd = open(path, O_RDONLY)) < 0){
-        send_error_response(connection_fd, 403, "Forbidden", "<h1>Forbidden</h1>");
-        return;
-    }
-
-    char *type = get_content_type(path);
-
-    char *response_buffer = calloc(RESPONSE_BUFFER_LEN, sizeof(char));
-    ssize_t response_len = 0;
-
-    ssize_t bytes_read;
-    while ((bytes_read = read(file_fd, 
-                            response_buffer + response_len, 
-                            RESPONSE_BUFFER_LEN - response_len)) > 0) {
-        response_len += bytes_read;
-    }
-    send_http_response(connection_fd, 200, "OK", type, response_len,response_buffer);
-    close(file_fd);
-    free(response_buffer);
 
     return;
 }
@@ -205,23 +233,11 @@ int main(int argc, char* argv[]){
     for(;;){
         int connect_fd = my_accept(server_fd, NULL, NULL);
         printf("Accepted\n");
-
-        /*
-        struct timeval conn_time;
-        conn_time.tv_usec = TIMEOUT * 1000;
-        setsockopt(connect_fd, SOL_SOCKET, SO_RCVTIMEO, &conn_time, sizeof(conn_time));
-        */
         run_server_logic(connect_fd, directory_path);
 
         close(connect_fd);
     }
 
     close(server_fd);
-
-
-
-
-
-
 
 }

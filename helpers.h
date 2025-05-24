@@ -13,7 +13,7 @@
 
 
 
-#define TIMEOUT 1000
+#define TIMEOUT 500
 
 
 #define MIN_PORT 1024
