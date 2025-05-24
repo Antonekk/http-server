@@ -7,13 +7,14 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <poll.h>
+#include <fcntl.h>
 
 #include "wrappers.h"
 #include "helpers.h"
 
 
 #define REQUEST_BUFFER_LEN 1024
-#define RESPONSE_BUFFER_LEN 100000
+#define RESPONSE_BUFFER_LEN 1000000
 
 
 // Setup sockaddr_in structure for server 
@@ -25,33 +26,35 @@ void setup_server_addr(struct sockaddr_in *server_addr, int port_number){
 }
 
 
-char *get_content_type(char *ext){
-    if (strcmp(ext, ".html") == 0) return "text/html; charset=utf-8";
-    else if (strcmp(ext, ".txt") == 0) return "text/plain, charset=utf-8";
-    else if (strcmp(ext, ".css" ) == 0) return "text/css";
-    else if (strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0) return "image/jpeg";
-    else if (strcmp(ext, ".png")) return "image/png";
-    else if (strcmp(ext, ".pdf")) return "application/pdf";
+char *get_content_type(char *file_path){
+    char *extention = strrchr(file_path, '.');
+    if(!extention) return "application/octet-stream";
+    if (strcmp(extention, ".html") == 0) return "text/html; charset=utf-8";
+    else if (strcmp(extention, ".txt") == 0) return "text/plain, charset=utf-8";
+    else if (strcmp(extention, ".css" ) == 0) return "text/css";
+    else if (strcmp(extention, ".jpg") == 0 || strcmp(extention, ".jpeg") == 0) return "image/jpeg";
+    else if (strcmp(extention, ".png") == 0) return "image/png";
+    else if (strcmp(extention, ".pdf") == 0) return "application/pdf";
     else return "application/octet-stream";
 
 }
 
-void send_http_response(int fd, int code, char *code_interpr, char *content_type , char *body){
+void send_http_response(int fd, int code, char *code_interpr, char *content_type , ssize_t content_length,char *body){
     char response_buf[RESPONSE_BUFFER_LEN];
     int written = snprintf(response_buf, RESPONSE_BUFFER_LEN,
         "HTTP/1.1 %d %s\r\n"
         "Content-Type: %s\r\n"
         "Content-Length: %ld\r\n"
-        "\r\n"
-        "%s",
-        code, code_interpr, content_type, strlen(body),body
+        "\r\n",
+        code, code_interpr, content_type, content_length
     );
 
     send(fd, response_buf, written, 0);
+    send(fd, body, content_length, 0);
 }
 
 static inline void send_error_response(int fd, int code, char *code_interpr, char *body){
-    send_http_response(fd, code , code_interpr, "text/html; charset=utf-8", body);
+    send_http_response(fd, code , code_interpr, "text/html; charset=utf-8", strlen(body),body);
 }
 
 static inline void send_not_implemented_response(int fd){
@@ -94,16 +97,41 @@ void run_server_logic(int connection_fd, char *root){
     snprintf(new_root, sizeof(new_root),"%s/%s", root, host);
 
     // Check if after path resolution, resolved path has propper prefix
+    // TODO, 
+    /*
     char resolved_path[256];
     if (!realpath(path, resolved_path) || strncmp(resolved_path, new_root, strlen(new_root)) != 0) {
+        printf("\n\nRoot: %s\nNew Root: %s\n Path: %s\nResolved: %s\n", root, new_root, path,resolved_path);
         send_error_response(connection_fd, 403, "Forbidden", "<h1>Forbidden</h1>");
         return;
     }
+    */
 
+    struct stat file_stat;
+    printf("Path: %s\n", path);
+    if(stat(path, &file_stat) != 0){
+        send_error_response(connection_fd, 404, "Not Found", "<h1> Not Found </h1>");
+    }
 
-    
+    int file_fd;
+    if((file_fd = open(path, O_RDONLY)) < 0){
+        send_error_response(connection_fd, 403, "Forbidden", "<h1>Forbidden</h1>");
+    }
 
-    send_error_response(connection_fd, 501, "Not Implemented","<h1> Not Implemented </h1>");
+    char *type = get_content_type(path);
+
+    char *response_buffer = calloc(RESPONSE_BUFFER_LEN, sizeof(char));
+    ssize_t response_len = 0;
+
+    ssize_t bytes_read;
+    while ((bytes_read = read(file_fd, 
+                            response_buffer + response_len, 
+                            RESPONSE_BUFFER_LEN - response_len)) > 0) {
+        response_len += bytes_read;
+    }
+    send_http_response(connection_fd, 200, "OK", type, response_len,response_buffer);
+    close(file_fd);
+    free(response_buffer);
 
     return;
 }
