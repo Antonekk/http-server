@@ -45,22 +45,17 @@ int my_poll(struct pollfd *fds, nfds_t nfds, int timeout){
     return res;
 }
 
-ssize_t my_sendto(int fd, const void *buf, size_t n, int flags, const struct sockaddr *addr, socklen_t addr_len){
-    ssize_t result = sendto(fd, buf, n, flags, addr, addr_len);
-    if(result < 0){
-        error_exit("sendto");
+
+
+ssize_t my_send(int fd, char *buf, size_t n, int flags)
+{
+    ssize_t res = send(fd, buf, n, flags);
+    if(res < 0){
+        perror("send");
     }
-    return result;
+    return res;
 }
 
-ssize_t my_recvfrom(int sockfd, void *buf, size_t len, int flags,
-                    struct sockaddr *addr, socklen_t *addr_len){
-    ssize_t result = recvfrom(sockfd, buf, len, flags, addr, addr_len);
-    if (result < 0){
-        error_exit("recvfrom");
-    }
-    return result;
-}
 
 
 void *my_calloc(size_t nmemb, size_t size) {
@@ -79,19 +74,6 @@ int my_clock_gettime(clockid_t clockid, struct timespec *tp){
 }
 
 
-void my_inet_pton(int af, const char *src, void *dst){
-    int res = inet_pton(af, src, dst);
-    if (res == 1){
-        return;
-    }
-    if (res == 0){
-        msg_exit("src does not contain a string representing a valid network address in the specified address family");
-    }
-    else{{
-        error_exit("inet_pton");
-    }}
-}
-
 int my_atoi(char *src){
     int result;
     if (!(result = atoi(src))){
@@ -108,22 +90,6 @@ void my_stat(char *pathname, struct stat *statbuf)
     }
 }
 
-FILE *my_fopen(const char *filename, const char *mode){
-    FILE *fd = fopen(filename, mode);
-    if(!fd){
-        error_exit("fopen");
-    }
-    return fd;
-}
-
-void my_fwrite(void *ptr, size_t size, size_t count, FILE *file)
-{
-    size_t written = fwrite(ptr, size, count, file);
-    if (written < count && ferror(file)) {
-        error_exit("fwrite");
-    }
-
-}
 
 int my_close(int fd)
 {
@@ -134,11 +100,3 @@ int my_close(int fd)
     return res;
 }
 
-int my_fclose(FILE *file)
-{
-    int res = fclose(file);
-    if(res != 0){
-        error_exit("fclose");
-    }
-    return res;
-}

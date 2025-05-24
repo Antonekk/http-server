@@ -10,7 +10,6 @@
 #include <sys/stat.h>
 #include "helpers.h"
 
-void my_inet_pton(int af, const char *src, void *dst);
 
 int my_socket(int domain, int type, int protocol);
 
@@ -20,11 +19,8 @@ int my_accept(int sockfd, struct sockaddr *addr, socklen_t *addr_len);
 
 int my_poll(struct pollfd *fds, nfds_t nfds, int timeout);
 
-ssize_t my_sendto(int fd, const void *buf, size_t n, int flags, 
-                    const struct sockaddr *addr, socklen_t addr_len);
 
-ssize_t my_recvfrom(int sockfd, void *buf, size_t len, int flags,
-                    struct sockaddr *addr, socklen_t *addr_len);
+ssize_t my_send(int fd, char *buf, size_t n, int flags);
 
 void *my_calloc(size_t nmemb, size_t size);
 
@@ -34,11 +30,9 @@ int my_atoi(char *src);
 
 void my_stat(char *pathname, struct stat *statbuf);
 
-FILE *my_fopen(const char *filename, const char *mode);
-void my_fwrite(void *ptr, size_t size, size_t count, FILE *file);
 
 int my_close(int fd);
-int my_fclose(FILE *file);
+
 
 
 
