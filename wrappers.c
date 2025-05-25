@@ -49,14 +49,32 @@ int my_poll(struct pollfd *fds, nfds_t nfds, int timeout){
 
 ssize_t my_send(int fd, char *buf, size_t n, int flags)
 {
-    ssize_t res = send(fd, buf, n, flags);
-    if(res < 0){
-        perror("send");
+    size_t sent = 0;
+    while(sent < n){
+        ssize_t res = send(fd, buf + sent, n - sent, flags);
+        if(res < 0){
+            perror("send");
+        }
+        if(sent == 0) break;
+        sent += res;
     }
-    return res;
+    return sent;
 }
 
-
+ssize_t my_sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
+{
+    size_t sent = 0;
+    while(sent < count){
+        ssize_t res = sendfile(out_fd, in_fd, offset, count);
+        if(res < 0){
+            perror("sendfile");
+        }
+        if(res == 0) break;
+        sent += res;
+    }
+    
+    return sent;
+}
 
 void *my_calloc(size_t nmemb, size_t size) {
     void *ptr = calloc(nmemb, size);

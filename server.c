@@ -61,7 +61,7 @@ void send_http_response_from_file(int fd,int file_fd, struct stat st ,int code, 
     int written = construct_header(response_buf, code, code_interpr, content_type, content_length);
 
     my_send(fd, response_buf, written, 0);
-    sendfile(fd, file_fd, NULL, st.st_size);
+    my_sendfile(fd, file_fd, NULL, st.st_size);
 }
 
 void send_redirect_response(int fd, const char *location) {
@@ -167,7 +167,7 @@ void run_server_logic(int connection_fd, char *root){
         }
 
         struct stat file_stat;
-        printf("Path: %s\n", path);
+        DEBUG_PRINT("Path: %s\n", path);
         if(stat(path, &file_stat) != 0){
             send_template_error_response(connection_fd, 404, "Not Found");
             break;
@@ -192,7 +192,7 @@ void run_server_logic(int connection_fd, char *root){
         char *type = get_content_type(path);
         send_http_response_from_file(connection_fd,file_fd,file_stat, 200, "OK", type, file_stat.st_size);
         
-        close(file_fd);
+        my_close(file_fd);
     }
 
     return;
@@ -245,9 +245,9 @@ int main(int argc, char* argv[]){
         printf("Accepted\n");
         run_server_logic(connect_fd, directory_path);
 
-        close(connect_fd);
+        my_close(connect_fd);
     }
 
-    close(server_fd);
+    my_close(server_fd);
 
 }

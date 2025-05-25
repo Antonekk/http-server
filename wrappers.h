@@ -8,6 +8,7 @@
 #include <poll.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/sendfile.h>
 #include "helpers.h"
 
 
@@ -21,6 +22,7 @@ int my_poll(struct pollfd *fds, nfds_t nfds, int timeout);
 
 
 ssize_t my_send(int fd, char *buf, size_t n, int flags);
+ssize_t my_sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 
 void *my_calloc(size_t nmemb, size_t size);
 
